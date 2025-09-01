@@ -347,6 +347,18 @@ class LiveKitTransportClient:
     def __str__(self):
         return f"{self._transport_name}::LiveKitTransportClient"
 
+    # Netic Extension: Clear audio buffer
+    def clear_audio_buffer(self):
+        """Clear the audio buffer."""
+        if self._audio_source:
+            logger.info(
+                f"Clearing audio buffer (queued_duration before: {self._audio_source.queued_duration})"
+            )
+            self._audio_source.clear_queue()
+            logger.info(
+                f"Audio buffer cleared (queued_duration after: {self._audio_source.queued_duration})"
+            )
+
 
 class LiveKitInputTransport(BaseInputTransport):
     def __init__(
@@ -511,6 +523,12 @@ class LiveKitOutputTransport(BaseOutputTransport):
             samples_per_channel=samples_per_channel,
         )
 
+    # Netic Extension: Clear audio buffer
+    def clear_audio_buffer(self):
+        """Clear the audio buffer."""
+        if self._client:
+            logger.info("Clearing audio buffer with client")
+            self._client.clear_audio_buffer()
 
 class LiveKitTransport(BaseTransport):
     def __init__(
