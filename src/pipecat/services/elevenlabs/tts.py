@@ -39,6 +39,7 @@ from pipecat.services.tts_service import (
 )
 from pipecat.transcriptions.language import Language
 from pipecat.utils.tracing.service_decorators import traced_tts
+from pipecat.processors.tts_text_transformer import TTSTextTransformer
 
 # See .env.example for ElevenLabs configuration needed
 try:
@@ -337,6 +338,9 @@ class ElevenLabsTTSService(AudioContextWordTTSService):
         self._context_id = None
         self._receive_task = None
         self._keepalive_task = None
+
+        # Text preprocessor for better pronunciation
+        self._text_transformer = TTSTextTransformer()
 
     def can_generate_metrics(self) -> bool:
         """Check if this service can generate processing metrics.
@@ -700,11 +704,12 @@ class ElevenLabsTTSService(AudioContextWordTTSService):
                         msg["voice_settings"] = self._voice_settings
                     await self._websocket.send(json.dumps(msg))
                     logger.trace(f"Created new context {self._context_id} with voice settings")
-
-                    await self._send_text(text)
-                    await self.start_tts_usage_metrics(text)
+                    transformed_text = self._text_transformer.transform(text)
+                    await self._send_text(transformed_text)
+                    await self.start_tts_usage_metrics(transformed_text)
                 else:
-                    await self._send_text(text)
+                    transformed_text = self._text_transformer.transform(text)
+                    await self._send_text(transformed_text)
             except Exception as e:
                 logger.error(f"{self} error sending message: {e}")
                 yield TTSStoppedFrame()
