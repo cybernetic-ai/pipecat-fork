@@ -33,6 +33,7 @@ from pipecat.services.tts_service import (
 )
 from pipecat.transcriptions.language import Language
 from pipecat.utils.tracing.service_decorators import traced_tts
+from pipecat.processors.tts_text_transformer import TTSTextTransformer
 
 # See .env.example for ElevenLabs configuration needed
 try:
@@ -241,6 +242,9 @@ class ElevenLabsTTSService(AudioContextWordTTSService):
         self._context_id = None
         self._receive_task = None
         self._keepalive_task = None
+
+        # Text preprocessor for better pronunciation
+        self._text_transformer = TTSTextTransformer()
 
     def can_generate_metrics(self) -> bool:
         return True
@@ -475,7 +479,9 @@ class ElevenLabsTTSService(AudioContextWordTTSService):
                     self._context_id = str(uuid.uuid4())
                     await self.create_audio_context(self._context_id)
 
-                await self._send_text(text)
+                # Transform text for better pronunciation
+                transformed_text = self._text_transformer.transform(text)
+                await self._send_text(transformed_text)
                 await self.start_tts_usage_metrics(text)
             except Exception as e:
                 logger.error(f"{self} error sending message: {e}")
