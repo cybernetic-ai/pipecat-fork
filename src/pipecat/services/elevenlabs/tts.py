@@ -240,6 +240,8 @@ class ElevenLabsTTSService(AudioContextWordTTSService):
         sample_rate: Optional[int] = None,
         params: Optional[InputParams] = None,
         aggregate_sentences: Optional[bool] = True,
+        push_stop_frames: bool = True,
+        push_text_frames: bool = False,
         **kwargs,
     ):
         """Initialize the ElevenLabs TTS service.
@@ -270,8 +272,8 @@ class ElevenLabsTTSService(AudioContextWordTTSService):
         # after a short period not receiving any audio.
         super().__init__(
             aggregate_sentences=aggregate_sentences,
-            push_text_frames=False,
-            push_stop_frames=True,
+            push_text_frames=push_text_frames,
+            push_stop_frames=push_stop_frames,
             pause_frame_processing=True,
             sample_rate=sample_rate,
             **kwargs,
@@ -588,6 +590,11 @@ class ElevenLabsTTSService(AudioContextWordTTSService):
                 await self._connect()
 
             try:
+                if self._context_id and not self.audio_context_available(self._context_id):
+                    self._context_id = None
+                    self._started = False
+                    logger.warning(f"{self} context {self._context_id} no longer available, resetting state")
+                
                 if not self._started:
                     await self.start_ttfb_metrics()
                     yield TTSStartedFrame()
