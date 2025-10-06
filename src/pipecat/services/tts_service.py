@@ -405,10 +405,15 @@ class TTSService(AIService):
 
         await self.stop_processing_metrics()
 
-        if self._push_text_frames:
-            # We send the original text after the audio. This way, if we are
-            # interrupted, the text is not added to the assistant context.
-            await self.push_frame(TTSTextFrame(text))
+
+        # NOTE: This is disabled because
+        # We already push the text frames in the word handler.
+        # And do not need to push them again here.
+        
+        # if self._push_text_frames:
+        #     # We send the original text after the audio. This way, if we are
+        #     # interrupted, the text is not added to the assistant context.
+        #     await self.push_frame(TTSTextFrame(text))
 
     async def _stop_frame_handler(self):
         has_started = False
