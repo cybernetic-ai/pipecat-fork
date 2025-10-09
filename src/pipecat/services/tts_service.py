@@ -32,8 +32,6 @@ from pipecat.frames.frames import (
     TTSStoppedFrame,
     TTSTextFrame,
     TTSUpdateSettingsFrame,
-    ToolCallStartedFrame,
-    ToolCallEndedFrame,
 )
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.ai_service import AIService
@@ -406,11 +404,16 @@ class TTSService(AIService):
             await self.process_generator(self.run_tts(text))
 
         await self.stop_processing_metrics()
+
+
+        # NOTE: This is disabled because
+        # We already push the text frames in the word handler.
+        # And do not need to push them again here.
         
-        if self._push_text_frames:
-            # We send the original text after the audio. This way, if we are
-            # interrupted, the text is not added to the assistant context.
-            await self.push_frame(TTSTextFrame(text))
+        # if self._push_text_frames:
+        #     # We send the original text after the audio. This way, if we are
+        #     # interrupted, the text is not added to the assistant context.
+        #     await self.push_frame(TTSTextFrame(text))
 
     async def _stop_frame_handler(self):
         has_started = False
@@ -448,7 +451,6 @@ class WordTTSService(TTSService):
         self._initial_word_timestamp = -1
         self._words_task = None
         self._llm_response_started: bool = False
-        self._in_tool_call: bool = False
 
     def start_word_timestamps(self):
         """Start tracking word timestamps from the current time."""
@@ -503,10 +505,7 @@ class WordTTSService(TTSService):
             direction: The direction of frame processing.
         """
         await super().process_frame(frame, direction)
-        if isinstance(frame, ToolCallStartedFrame):
-            self._in_tool_call = True
-        elif isinstance(frame, ToolCallEndedFrame):
-            self._in_tool_call = False
+
         if isinstance(frame, LLMFullResponseStartFrame):
             self._llm_response_started = True
         elif isinstance(frame, (LLMFullResponseEndFrame, EndFrame)):
@@ -534,7 +533,7 @@ class WordTTSService(TTSService):
             (word, timestamp) = await self._words_queue.get()
             if word == "Reset" and timestamp == 0:
                 self.reset_word_timestamps()
-                if self._llm_response_started and not self.in_tool_call:
+                if self._llm_response_started:
                     self._llm_response_started = False
                     frame = LLMFullResponseEndFrame()
                     frame.pts = last_pts

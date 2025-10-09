@@ -1382,30 +1382,3 @@ class MixerEnableFrame(MixerControlFrame):
     """
 
     enable: bool
-
-
-@dataclass
-class ToolCallStartFrame(SystemFrame):
-    """
-    A custom frame used to signal that a tool call is starting.
-    This allows processors like UserIdleProcessor to pause the idle timer until the tool call is complete.
-
-    Attributes are used to create the TranscriptAdditionalContext object.
-    """
-
-    tool_call_id: Optional[str]
-    tool_name: str
-    tool_arguments: dict[str, Any]
-
-
-@dataclass
-class ToolCallEndFrame(SystemFrame):
-    """
-    A custom frame used to signal that a tool call has ended.
-    This allows processors like UserIdleProcessor to resume the idle timer.
-
-    Attributes are used to create the TranscriptAdditionalContext object.
-    """
-
-    tool_call_id: Optional[str]
-    tool_result: str
