@@ -32,8 +32,8 @@ from pipecat.frames.frames import (
     TTSStoppedFrame,
     TTSTextFrame,
     TTSUpdateSettingsFrame,
-    ToolCallStartFrame,
-    ToolCallEndFrame,
+    ToolCallStartedFrame,
+    ToolCallEndedFrame,
 )
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.ai_service import AIService
@@ -503,9 +503,9 @@ class WordTTSService(TTSService):
             direction: The direction of frame processing.
         """
         await super().process_frame(frame, direction)
-        if isinstance(frame, ToolCallStartFrame):
+        if isinstance(frame, ToolCallStartedFrame):
             self._in_tool_call = True
-        elif isinstance(frame, ToolCallEndFrame):
+        elif isinstance(frame, ToolCallEndedFrame):
             self._in_tool_call = False
         if isinstance(frame, LLMFullResponseStartFrame):
             self._llm_response_started = True
@@ -534,7 +534,7 @@ class WordTTSService(TTSService):
             (word, timestamp) = await self._words_queue.get()
             if word == "Reset" and timestamp == 0:
                 self.reset_word_timestamps()
-                if self._llm_response_started and not self._in_tool_call:
+                if self._llm_response_started and not self.in_tool_call:
                     self._llm_response_started = False
                     frame = LLMFullResponseEndFrame()
                     frame.pts = last_pts
