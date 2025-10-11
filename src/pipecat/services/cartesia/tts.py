@@ -112,6 +112,7 @@ class CartesiaTTSService(AudioContextWordTTSService):
         language: Optional[Language] = Language.EN
         speed: Optional[Literal["slow", "normal", "fast"]] = None
         emotion: Optional[List[str]] = []
+        pronunciation_dictionary: Optional[dict[str, str]] = None
 
     def __init__(
         self,
