@@ -229,6 +229,7 @@ class ElevenLabsTTSService(AudioContextWordTTSService):
         auto_mode: Optional[bool] = True
         enable_ssml_parsing: Optional[bool] = None
         enable_logging: Optional[bool] = None
+        pronunciation_dictionary: Optional[dict[str, str]] = None
 
     def __init__(
         self,
