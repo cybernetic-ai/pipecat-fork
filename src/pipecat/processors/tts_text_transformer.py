@@ -907,6 +907,8 @@ class TTSTextTransformer:
         def replace_number(match):
             return self.transform_quantity_number(match.group(0))
         result = re.sub(self.STANDALONE_NUMBER_PATTERN, replace_number, result)
+
+        result = result.replace("Caccia", "Kotchya")
         
         # 12. Apply pronunciation dictionary with phoneme tags
         result = self.apply_pronunciation_dictionary(result)
