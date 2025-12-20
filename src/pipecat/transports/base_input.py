@@ -42,6 +42,8 @@ from pipecat.frames.frames import (
     VADParamsUpdateFrame,
     VADUserStartedSpeakingFrame,
     VADUserStoppedSpeakingFrame,
+    BotStartedThinkingFrame,
+    BotStoppedThinkingFrame,
 )
 from pipecat.metrics.metrics import MetricsData
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
@@ -74,6 +76,7 @@ class BaseInputTransport(FrameProcessor):
 
         # Track bot speaking state for interruption logic
         self._bot_speaking = False
+        self._bot_thinking = False
 
         # Track user speaking state for interruption logic
         self._user_speaking = False
@@ -291,6 +294,11 @@ class BaseInputTransport(FrameProcessor):
         elif isinstance(frame, BotStoppedSpeakingFrame):
             await self._handle_bot_stopped_speaking(frame)
             await self.push_frame(frame, direction)
+        elif isinstance(frame, BotStartedThinkingFrame):
+            await self._handle_bot_started_thinking(frame)
+        elif isinstance(frame, BotStoppedThinkingFrame):
+            await self._handle_bot_stopped_thinking(frame)
+            await self.push_frame(frame, direction)
         elif isinstance(frame, EmulateUserStartedSpeakingFrame):
             logger.debug("Emulating user started speaking")
             await self._handle_user_interruption(VADState.SPEAKING, emulated=True)
@@ -341,13 +349,13 @@ class BaseInputTransport(FrameProcessor):
             # 1. No interruption config is set, OR
             # 2. Interruption config is set but bot is not speaking
             should_push_immediate_interruption = (
-                not self.interruption_strategies or not self._bot_speaking
+                not self.interruption_strategies or (not self._bot_speaking and not self._bot_thinking)
             )
 
             # Make sure we notify about interruptions quickly out-of-band.
             if should_push_immediate_interruption and self.interruptions_allowed:
                 await self.push_interruption_task_frame_and_wait()
-            elif self.interruption_strategies and self._bot_speaking:
+            elif self.interruption_strategies and (self._bot_speaking or self._bot_thinking):
                 logger.debug(
                     "User started speaking while bot is speaking with interruption config - "
                     "deferring interruption to aggregator"
@@ -369,6 +377,14 @@ class BaseInputTransport(FrameProcessor):
     async def _handle_bot_stopped_speaking(self, frame: BotStoppedSpeakingFrame):
         """Update bot speaking state when bot stops speaking."""
         self._bot_speaking = False
+
+    async def _handle_bot_started_thinking(self, frame: BotStartedThinkingFrame):
+        """Update bot thinking state when bot starts thinking."""
+        self._bot_thinking = True
+
+    async def _handle_bot_stopped_thinking(self, frame: BotStoppedThinkingFrame):
+        """Update bot thinking state when bot stops thinking."""
+        self._bot_thinking = False
 
     #
     # Audio input

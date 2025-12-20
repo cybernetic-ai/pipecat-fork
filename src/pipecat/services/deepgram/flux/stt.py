@@ -580,7 +580,7 @@ class DeepgramFluxSTTService(WebsocketSTTService):
         """
         logger.debug("User started speaking")
         self._user_is_speaking = True
-        await self.push_interruption_task_frame_and_wait()
+        # await self.push_interruption_task_frame_and_wait()
         await self.broadcast_frame(UserStartedSpeakingFrame)
         await self.start_metrics()
         await self._call_event_handler("on_start_of_turn", transcript)
@@ -728,4 +728,16 @@ class DeepgramFluxSTTService(WebsocketSTTService):
             # both the "user started speaking" event and the first transcript simultaneously,
             # making this timing measurement meaningless in this context.
             # await self.stop_ttfb_metrics()
+            await self._call_event_handler("on_update", transcript)
+
+            # Push InterimTranscriptionFrame so aggregators can check interruption strategies
+            # on every update, enabling real-time interruption based on word count or other criteria
+            await self.push_frame(
+                InterimTranscriptionFrame(
+                    transcript,
+                    self._user_id,
+                    time_now_iso8601(),
+                    self._language,
+                )
+            )
             await self._call_event_handler("on_update", transcript)
