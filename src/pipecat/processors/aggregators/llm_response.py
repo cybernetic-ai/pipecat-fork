@@ -23,7 +23,9 @@ from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
+    BotStartedThinkingFrame,
     BotStoppedSpeakingFrame,
+    BotStoppedThinkingFrame,
     CancelFrame,
     EmulateUserStartedSpeakingFrame,
     EmulateUserStoppedSpeakingFrame,
@@ -50,6 +52,7 @@ from pipecat.frames.frames import (
     StartFrame,
     TextFrame,
     TranscriptionFrame,
+    UserAudioRawFrame,
     UserImageRawFrame,
     UserStartedSpeakingFrame,
     UserStoppedSpeakingFrame,
@@ -435,6 +438,7 @@ class LLMUserContextAggregator(LLMContextResponseAggregator):
 
         self._user_speaking = False
         self._bot_speaking = False
+        self._bot_thinking = False
         self._was_bot_speaking = False
         self._emulating_vad = False
         self._seen_interim_results = False
@@ -496,6 +500,12 @@ class LLMUserContextAggregator(LLMContextResponseAggregator):
         elif isinstance(frame, BotStoppedSpeakingFrame):
             await self._handle_bot_stopped_speaking(frame)
             await self.push_frame(frame, direction)
+        elif isinstance(frame, BotStartedThinkingFrame):
+            await self._handle_bot_started_thinking(frame)
+            await self.push_frame(frame, direction)
+        elif isinstance(frame, BotStoppedThinkingFrame):
+            await self._handle_bot_stopped_thinking(frame)
+            await self.push_frame(frame, direction)
         elif isinstance(frame, TranscriptionFrame):
             await self._handle_transcription(frame)
         elif isinstance(frame, InterimTranscriptionFrame):
@@ -528,7 +538,7 @@ class LLMUserContextAggregator(LLMContextResponseAggregator):
     async def push_aggregation(self):
         """Push the current aggregation based on interruption strategies and conditions."""
         if len(self._aggregation) > 0:
-            if self.interruption_strategies and self._bot_speaking:
+            if self.interruption_strategies and (self._bot_speaking or self._bot_thinking):
                 should_interrupt = await self._should_interrupt_based_on_strategies()
 
                 if should_interrupt:
@@ -630,6 +640,12 @@ class LLMUserContextAggregator(LLMContextResponseAggregator):
     async def _handle_bot_stopped_speaking(self, _: BotStoppedSpeakingFrame):
         self._bot_speaking = False
 
+    async def _handle_bot_started_thinking(self, _: BotStartedThinkingFrame):
+        self._bot_thinking = True
+
+    async def _handle_bot_stopped_thinking(self, _: BotStoppedThinkingFrame):
+        self._bot_thinking = False
+
     async def _handle_transcription(self, frame: TranscriptionFrame):
         text = frame.text
 
@@ -643,8 +659,22 @@ class LLMUserContextAggregator(LLMContextResponseAggregator):
         # Reset aggregation timer.
         self._aggregation_event.set()
 
-    async def _handle_interim_transcription(self, _: InterimTranscriptionFrame):
+    async def _handle_interim_transcription(self, frame: InterimTranscriptionFrame):
         self._seen_interim_results = True
+
+        # Check interruption strategy on every interim transcript if bot is speaking or thinking
+        # This allows strategies to be evaluated as the user speaks, not just when they stop
+        if frame.text and self.interruption_strategies and (self._bot_speaking or self._bot_thinking):
+            # Pass the interim text to the interruption strategies and check
+            async def should_interrupt(strategy):
+                await strategy.append_text(frame.text)
+                return await strategy.should_interrupt()
+
+            if any([await should_interrupt(s) for s in self._interruption_strategies]):
+                logger.debug(
+                    f"Interruption strategy met on interim transcript (text='{frame.text}') - triggering interruption"
+                )
+                await self.push_interruption_task_frame_and_wait()
 
     def _create_aggregation_task(self):
         if not self._aggregation_task:
