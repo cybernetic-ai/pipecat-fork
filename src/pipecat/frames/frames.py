@@ -999,6 +999,21 @@ class BotStoppedSpeakingFrame(SystemFrame):
 
     pass
 
+@dataclass
+class BotStartedThinkingFrame(SystemFrame):
+    """
+    A custom frame used to signal that the bot has started thinking.
+    """
+
+    pass
+
+@dataclass
+class BotStoppedThinkingFrame(SystemFrame):
+    """
+    A custom frame used to signal that the bot has stopped thinking.
+    """
+    pass
+
 
 @dataclass
 class BotSpeakingFrame(SystemFrame):
