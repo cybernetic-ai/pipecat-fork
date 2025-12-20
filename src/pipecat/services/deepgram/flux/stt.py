@@ -729,3 +729,15 @@ class DeepgramFluxSTTService(WebsocketSTTService):
             # making this timing measurement meaningless in this context.
             # await self.stop_ttfb_metrics()
             await self._call_event_handler("on_update", transcript)
+
+            # Push InterimTranscriptionFrame so aggregators can check interruption strategies
+            # on every update, enabling real-time interruption based on word count or other criteria
+            await self.push_frame(
+                InterimTranscriptionFrame(
+                    transcript,
+                    self._user_id,
+                    time_now_iso8601(),
+                    self._language,
+                )
+            )
+            await self._call_event_handler("on_update", transcript)
