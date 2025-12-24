@@ -912,6 +912,7 @@ class TTSTextTransformer:
         result = self._clean_special_characters(result)
 
         result = result.replace("Caccia", "Kotchya")
+        result = result.replace("caccia", "Kotchya")
 
          # 13. Apply pronunciation dictionary with phoneme tags
         result = self.apply_pronunciation_dictionary(result)
