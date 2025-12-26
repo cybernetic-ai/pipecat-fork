@@ -445,6 +445,14 @@ class CartesiaTTSService(AudioContextWordTTSService):
         await self._websocket.send(msg)
         self._context_id = None
 
+    async def remove_audio_context(self, context_id: str):
+        """Override to also clear _context_id when context is removed."""
+        await super().remove_audio_context(context_id)
+        # Clear _context_id if this was our current context
+        if self._context_id == context_id:
+            logger.debug(f"{self} clearing _context_id after removing context {context_id}")
+            self._context_id = None
+
     async def _process_messages(self):
         async for message in self._get_websocket():
             msg = json.loads(message)
