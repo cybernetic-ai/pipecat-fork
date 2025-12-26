@@ -449,11 +449,16 @@ class CartesiaTTSService(AudioContextWordTTSService):
         async for message in self._get_websocket():
             msg = json.loads(message)
             if not msg or not self.audio_context_available(msg["context_id"]):
+                logger.warning(f"{self} skipping message - context unavailable context_id={msg.get('context_id')}")
                 continue
             if msg["type"] == "done":
                 await self.stop_ttfb_metrics()
                 await self.add_word_timestamps([("TTSStoppedFrame", 0), ("Reset", 0)])
                 await self.remove_audio_context(msg["context_id"])
+                # Clear context_id so next TTS call creates a fresh context
+                if self._context_id == msg["context_id"]:
+                    logger.debug(f"{self} clearing context_id after 'done'")
+                    self._context_id = None
             elif msg["type"] == "timestamps":
                 # Process the timestamps based on language before adding them
                 processed_timestamps = self._process_word_timestamps_for_language(
@@ -500,13 +505,22 @@ class CartesiaTTSService(AudioContextWordTTSService):
 
         try:
             if not self._websocket or self._websocket.state is State.CLOSED:
+                logger.debug(f"{self}: Websocket closed, reconnecting...")
                 await self._connect()
 
-            if not self._context_id:
+            # Check if we need a new context (none exists or current one was deleted)
+            if not self._context_id or not self.audio_context_available(self._context_id):
+                if self._context_id:
+                    logger.debug(f"{self}: Previous context {self._context_id} unavailable, creating new one")
+                else:
+                    logger.debug(f"{self}: Creating new context for TTS")
                 await self.start_ttfb_metrics()
                 yield TTSStartedFrame()
                 self._context_id = str(uuid.uuid4())
                 await self.create_audio_context(self._context_id)
+                logger.debug(f"{self}: Created context {self._context_id}")
+            else:
+                logger.debug(f"{self}: Reusing existing context {self._context_id}")
 
             # Call the text transformer for better pronunciation
             transformed_text = self._text_transformer.transform(text)
@@ -516,7 +530,7 @@ class CartesiaTTSService(AudioContextWordTTSService):
                 await self._get_websocket().send(msg)
                 await self.start_tts_usage_metrics(text)
             except Exception as e:
-                logger.error(f"{self} exception: {e}")
+                logger.error(f"{self} exception sending to websocket: {e}")
                 yield ErrorFrame(error=f"{self} error: {e}")
                 yield TTSStoppedFrame()
                 await self._disconnect()
@@ -524,7 +538,7 @@ class CartesiaTTSService(AudioContextWordTTSService):
                 return
             yield None
         except Exception as e:
-            logger.error(f"{self} exception: {e}")
+            logger.error(f"{self} exception in run_tts: {e}")
             yield ErrorFrame(error=f"{self} error: {e}")
 
 
